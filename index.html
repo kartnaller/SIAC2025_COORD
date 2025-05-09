@@ -47,14 +47,12 @@
                     <label for="filtroModalidadeStatic" class="form-label filter-label">Filtrar por Modalidade:</label>
                     <select id="filtroModalidadeStatic" class="form-select form-select-sm filterable-select" data-column-name="Modalidade">
                         <option value="">Todas</option>
-                        {/* Options will be populated by JS */}
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label for="filtroTipoApresentacaoStatic" class="form-label filter-label">Filtrar por Tipo de Apresentação:</label>
                     <select id="filtroTipoApresentacaoStatic" class="form-select form-select-sm filterable-select" data-column-name="Tipo de Apresentação">
                         <option value="">Todas</option>
-                        {/* Options will be populated by JS */}
                     </select>
                 </div>
                 <div class="col-md-auto ms-auto">
@@ -862,22 +860,44 @@
     function populateFilterOptions(dataTable, columnNames) {
         columnNames.forEach(columnName => {
             const columnIndex = getColumnIndex(columnName);
-            const selectId = `#filtro${columnName.replace(/[^a-zA-Z0-9]/g, '')}Static`;
-            const $select = $(selectId);
+            // Constrói o ID do select (ex: #filtroModalidadeStatic, #filtroTipoapresentacaoStatic)
+            // Nota: .replace(/[^a-zA-Z0-9]/g, '') remove espaços e caracteres especiais do columnName para formar o ID.
+            // Isso significa que "Tipo de Apresentação" vira "TipodeApresentação" no ID.
+            // É crucial que o ID no HTML corresponda a isso ou que ajustemos a formação do ID aqui.
+            // VOU AJUSTAR O HTML PARA USAR O ID SEM ESPAÇOS GERADO AQUI.
+            // Se o id no HTML é filtroTipoApresentacaoStatic (com 'A' maiúsculo), o gerador de ID tem que ser consistente.
+            // Vamos manter a convenção de IDs como #filtroUnidadeStatic, #filtroModalidadeStatic, #filtroTipoApresentacaoStatic (CamelCase após 'filtro')
+
+            // Corrigindo a formação do ID do select para corresponder ao HTML:
+            let selectIdBase = columnName.replace(/\s+/g, ''); // Remove espaços -> TipodeApresentação
+            if (selectIdBase.length > 0) {
+                 selectIdBase = selectIdBase.charAt(0).toUpperCase() + selectIdBase.slice(1); // Primeira letra maiúscula -> TipodeApresentação
+            }
+            const selectId = `#filtro${selectIdBase}Static`; // #filtroTipodeApresentaçãoStatic -> Não, o HTML é #filtroTipoApresentacaoStatic
+
+            // Forma mais segura de gerar o ID que corresponda ao HTML fornecido:
+            let idSuffix = '';
+            if (columnName === 'Unidade') idSuffix = 'Unidade';
+            else if (columnName === 'Modalidade') idSuffix = 'Modalidade';
+            else if (columnName === 'Tipo de Apresentação') idSuffix = 'TipoApresentacao'; // Corresponde a filtroTipoApresentacaoStatic
+            else return; // Coluna não mapeada para um filtro conhecido
+
+            const finalSelectId = `#filtro${idSuffix}Static`;
+            const $select = $(finalSelectId);
 
             if ($select.length === 0 || columnIndex === -1) {
-                console.warn(`Select or column not found for: ${columnName}`);
+                console.warn(`Select ${finalSelectId} or column not found for: ${columnName}`);
                 return;
             }
             
-            // Only populate if it has just the "Todas" option
+            // Popula apenas se o select tiver 1 ou menos opções (normalmente, apenas a opção "Todas")
             if ($select.find('option').length <= 1) {
-                const uniqueValues = dataTable.column(columnIndex, { search: 'applied' }).data().unique().sort();
+                const uniqueValues = dataTable.column(columnIndex).data().unique().sort();
                 uniqueValues.each(function (value) {
-                    if (value && value.trim() !== "") {
+                    if (value && String(value).trim() !== "") { // Garante que value seja string antes de trim
                         $select.append($('<option>', {
                             value: value,
-                            text: value // Text of the option is just the value itself
+                            text: value 
                         }));
                     }
                 });
@@ -910,7 +930,6 @@
 
     function updateFilterCounts() {
         if (!staticDataTable) return;
-        // Only update the global count of displayed works
         const totalVisibleRows = staticDataTable.page.info().recordsDisplay;
         $('#totalTrabalhosCount').text(totalVisibleRows);
     }
@@ -1001,18 +1020,18 @@
         let filenameParts = ["Trabalhos_SIAC"];
         let filtersAppliedForFilename = false;
         if ($('#filtroUnidadeStatic').val() && $('#filtroUnidadeStatic').val() !== "sem-unidade-static") {
-             filenameParts.push($('#filtroUnidadeStatic option:selected').text()); // Use text directly
+             filenameParts.push($('#filtroUnidadeStatic option:selected').text());
              filtersAppliedForFilename = true;
         } else if ($('#filtroUnidadeStatic').val() === "sem-unidade-static") {
             filenameParts.push("SemUnidade");
             filtersAppliedForFilename = true;
         }
         if ($('#filtroModalidadeStatic').val()) {
-             filenameParts.push($('#filtroModalidadeStatic option:selected').text()); // Use text directly
+             filenameParts.push($('#filtroModalidadeStatic option:selected').text());
              filtersAppliedForFilename = true;
         }
         if ($('#filtroTipoApresentacaoStatic').val()) {
-             filenameParts.push($('#filtroTipoApresentacaoStatic option:selected').text()); // Use text directly
+             filenameParts.push($('#filtroTipoApresentacaoStatic option:selected').text());
              filtersAppliedForFilename = true;
         }
         if (!filtersAppliedForFilename) {
@@ -1035,10 +1054,9 @@
                 { extend: 'copyHtml5', text: '<i class="bi bi-files"></i> Copiar' }
             ],
             initComplete: function() {
-                // Populate filters for Modalidade and Tipo de Apresentação
+                // A API do DataTable (this.api()) já está disponível aqui
                 populateFilterOptions(this.api(), ['Modalidade', 'Tipo de Apresentação']);
-                // Initial update for the global count
-                updateFilterCounts();
+                updateFilterCounts(); // Atualiza a contagem global inicial
             }
         });
 
@@ -1050,19 +1068,17 @@
 
         $('.filterable-select').on('change', function() {
             applyAllStaticFilters(); 
-            // updateFilterCounts will be called by the draw event
         });
         
-        // Update counts whenever the table is drawn (e.g., after filtering, pagination, search)
         staticDataTable.on('draw.dt', function() {
             updateFilterCounts();
         });
 
         $('#exportXLSXStaticBtn').on('click', exportStaticTableToXLSX);
         
-        // Initial filter application (if any pre-selected) and count update
+        // Aplica filtros iniciais (se houver) e garante que a contagem seja atualizada
+        // A chamada a applyAllStaticFilters() já dispara um 'draw.dt', que chama updateFilterCounts()
         applyAllStaticFilters(); 
-        // updateFilterCounts(); // This will be called by the draw.dt event triggered by applyAllStaticFilters
     });
     </script>
 </body>
